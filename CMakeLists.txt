@@ -16,13 +16,19 @@ find_package(Qt5Quick REQUIRED)
 #configure_file(config.h.in config.h)
 add_definitions(-D__STDC_LIMIT_MACROS)
 add_definitions(-DDARLING_BUILD)
+add_definitions(-DOBJC2RUNTIME -U__APPLE__)
+add_definitions(-DHAVE_STDINT_H=1)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fconstant-string-class=NSConstantString -fblocks -fobjc-runtime=gnustep-1.7")
-#set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fblocks")
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -nostdlib -Wl,--version-script=${DARLING_TOP_DIRECTORY}/darwin.map")
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../util)
+include_directories(${DARLING_TOP_DIRECTORY}/src/util)
+include_directories(${CMAKE_BINARY_DIR}/src/external/corefoundation/Headers)
+include_directories(${CMAKE_BINARY_DIR}/src/external/foundation/Headers)
+include_directories(${DARLING_TOP_DIRECTORY}/src/external/foundation/Headers)
+include_directories(${DARLING_TOP_DIRECTORY}/src/external/corefoundation/Headers)
+include_directories(${DARLING_TOP_DIRECTORY}/src/external/libobjc2)
 
 set(AppKit_SRCS
 	NSApplication.mm
@@ -41,7 +47,7 @@ SET(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
 SET(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
 add_library(AppKit SHARED ${AppKit_SRCS})
-target_link_libraries(AppKit -lgnustep-base -lX11)
+target_link_libraries(AppKit CFFExtra)
 qt5_use_modules(AppKit Declarative Widgets Quick)
 
 install(TARGETS AppKit DESTINATION "${CMAKE_INSTALL_LIBDIR}/darling")
