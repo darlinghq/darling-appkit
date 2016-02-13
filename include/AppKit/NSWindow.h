@@ -185,7 +185,7 @@ typedef NSUInteger NSWindowButton;
 @interface NSWindow : NSResponder <NSAnimatablePropertyContainer, NSUserInterfaceValidations, NSUserInterfaceItemIdentification>
 {
 #ifdef DARLING_BUILD
-	std::shared_ptr<QQuickWindow> _window;
+	std::shared_ptr<QWindowSubclass> _window;
 	CGFloat _opacity;
 	bool _releasedWhenClosed;
 #endif
@@ -674,7 +674,11 @@ typedef NSUInteger NSWindowButton;
 
 @end
 
-
+#ifdef DARLING_BUILD
+@interface NSWindow (DarlingExt)
++ (NSWindow*) windowByWindowNumber: (NSInteger) winId;
+@end
+#endif
 
 EXTERN_C NSString *NSWindowDidBecomeKeyNotification;
 EXTERN_C NSString *NSWindowDidBecomeMainNotification;
@@ -695,10 +699,10 @@ EXTERN_C NSString *NSWindowDidEndSheetNotification;
 
 
 
-EXTERN_C NSString * const NSWindowDidChangeBackingPropertiesNotification;
+EXTERN_C NSString * NSWindowDidChangeBackingPropertiesNotification;
 
-EXTERN_C NSString * const NSBackingPropertyOldScaleFactorKey;
-EXTERN_C NSString * const NSBackingPropertyOldColorSpaceKey;
+EXTERN_C NSString * NSBackingPropertyOldScaleFactorKey;
+EXTERN_C NSString * NSBackingPropertyOldColorSpaceKey;
 
 
 
@@ -706,14 +710,14 @@ EXTERN_C NSString * const NSBackingPropertyOldColorSpaceKey;
 EXTERN_C NSString *NSWindowDidChangeScreenProfileNotification;
 
 
-EXTERN_C NSString * const NSWindowWillStartLiveResizeNotification;
+EXTERN_C NSString * NSWindowWillStartLiveResizeNotification;
 
-EXTERN_C NSString * const NSWindowDidEndLiveResizeNotification;
-EXTERN_C NSString * const NSWindowWillEnterFullScreenNotification;
-EXTERN_C NSString * const NSWindowDidEnterFullScreenNotification;
-EXTERN_C NSString * const NSWindowWillExitFullScreenNotification;
-EXTERN_C NSString * const NSWindowDidExitFullScreenNotification;
-EXTERN_C NSString * const NSWindowWillEnterVersionBrowserNotification;
-EXTERN_C NSString * const NSWindowDidEnterVersionBrowserNotification;
-EXTERN_C NSString * const NSWindowWillExitVersionBrowserNotification;
-EXTERN_C NSString * const NSWindowDidExitVersionBrowserNotification;
+EXTERN_C NSString * NSWindowDidEndLiveResizeNotification;
+EXTERN_C NSString * NSWindowWillEnterFullScreenNotification;
+EXTERN_C NSString * NSWindowDidEnterFullScreenNotification;
+EXTERN_C NSString * NSWindowWillExitFullScreenNotification;
+EXTERN_C NSString * NSWindowDidExitFullScreenNotification;
+EXTERN_C NSString * NSWindowWillEnterVersionBrowserNotification;
+EXTERN_C NSString * NSWindowDidEnterVersionBrowserNotification;
+EXTERN_C NSString * NSWindowWillExitVersionBrowserNotification;
+EXTERN_C NSString * NSWindowDidExitVersionBrowserNotification;

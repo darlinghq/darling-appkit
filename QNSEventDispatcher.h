@@ -4,28 +4,9 @@
 #include <QHash>
 #include <QQueue>
 #include <QTimerEvent>
-#include <Foundation/NSRunLoop.h>
-#include <Foundation/NSTimer.h>
-#include <Foundation/NSStream.h>
-#include <AppKit/NSEvent.h>
-
-class QNSEventDispatcher;
-@interface NSTimerInvocation : NSObject
-{
-	QNSEventDispatcher* m_disp;
-}
-
--(id) initWithEventDispatcher: (QNSEventDispatcher*) disp;
--(void) timerFired: (int)timerId;
-@end
-
-@interface QtSocketDelegate : NSObject //<NSStreamDelegate> // not until very recent gnustep-base code
-{
-	QSocketNotifier* m_notifier;
-}
-- (id)initWithSocketNotifier: (QSocketNotifier*)notifier;
-- (void)stream:(NSStream *)theStream handleEvent:(NSStreamEvent)streamEvent;
-@end
+#include <QDateTime>
+#include <dispatch/dispatch.h>
+#include <CoreFoundation/CFRunLoop.h>
 
 class QNSEventDispatcher : public QAbstractEventDispatcher
 {
@@ -55,18 +36,15 @@ private:
 		int interval;
 		Qt::TimerType type;
 		QObject* target;
-	};
-	struct MySocketInfo
-	{
-		QtSocketDelegate* delegate;
-		NSStream* stream;	
+		dispatch_source_t source;
+		struct timeval tv;
+		QDateTime lastFired;
 	};
 
-	NSRunLoop* m_runLoop;
-	QHash<int, NSTimer*> m_nsTimers;
+	CFRunLoopRef m_runLoop;
+	dispatch_queue_t m_queue;
 	QHash<int, MyTimerInfo> m_timers;
-	QHash<QSocketNotifier*, MySocketInfo> m_sockets;
-	NSTimerInvocation* m_timerInvocation;
+	QHash<QSocketNotifier*, dispatch_source_t> m_sockets;
 };
 
 #endif

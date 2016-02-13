@@ -5,34 +5,11 @@
 #include <iostream>
 #include <QCoreApplication>
 #include <QSocketNotifier>
-#include <CoreFoundation/CFRunLoop.h>
 #include <QPair>
 //#include <qpa/qwindowsysteminterface.h>
 #include <QtDebug>
 
 #define DISTANT_FUTURE	63113990400.0
-
-void QNSEventDispatcher::CFSocketCallback(CFSocketRef s, CFSocketCallBackType callbackType, CFDataRef address, const void *data, void *info)
-{
-	QEvent event(QEvent::SockAct);
-        int socket = CFSocketGetNative(s);
-	QSocketNotifier* notifier;
-	
-	if (callbackType == kCFSocketReadCallBack)
-		notifier = QNSEventDispatcher::instance()->m_sockets[socket].readNotifier;
-	else if (callbackType == kCFSocketWriteCallBack)
-		notifier = QNSEventDispatcher::instance()->m_sockets[socket].writeNotifier;
-	else
-		return;
-	
-        qDebug() << "Sending socket event";
-	QCoreApplication::sendEvent(notifier, &event);
-}
-
-static void CFRunLoopTimerCallback(CFRunLoopTimerRef timer, void *info)
-{
-	QNSEventDispatcher::instance()->fireTimer((int)(uintptr_t) info);
-}
 
 QNSEventDispatcher* QNSEventDispatcher::instance()
 {
@@ -42,7 +19,8 @@ QNSEventDispatcher* QNSEventDispatcher::instance()
 
 QNSEventDispatcher::QNSEventDispatcher()
 {
-	m_runLoop = CFRunLoopGetCurrent();
+	m_runLoop = CFRunLoopGetMain();
+	m_queue = dispatch_get_main_queue();
 }
 
 QNSEventDispatcher::~QNSEventDispatcher()
@@ -61,7 +39,7 @@ bool QNSEventDispatcher::hasPendingEvents()
 
 void QNSEventDispatcher::interrupt()
 {
-        qDebug() << "Interrupt";
+    qDebug() << "Interrupt";
 	CFRunLoopStop(m_runLoop);
 }
 
@@ -95,7 +73,7 @@ bool QNSEventDispatcher::processEvents(QEventLoop::ProcessEventsFlags flags)
 	qDebug() << "Run loop end";
 	
 	QCoreApplication::sendPostedEvents();
-        QWindowSystemInterface::sendWindowSystemEvents(flags);
+	QWindowSystemInterface::sendWindowSystemEvents(flags);
 	
 	return true;
 }
@@ -103,29 +81,7 @@ bool QNSEventDispatcher::processEvents(QEventLoop::ProcessEventsFlags flags)
 void QNSEventDispatcher::registerSocketNotifier(QSocketNotifier* notifier)
 {
 	int socket = notifier->socket();
-	CFSocketRef cfSocket;
-	CFOptionFlags cbTypes;
-	
-	if (!m_sockets.contains(socket))
-	{
-		CFRunLoopSourceRef src;
-		CFSocketContext ctxt;
-		MySocketInfo info;
-		
-		CFOptionFlags flags = kCFSocketAutomaticallyReenableReadCallBack | kCFSocketAutomaticallyReenableWriteCallBack;
-		
-		memset(&ctxt, 0, sizeof(ctxt));
-		cfSocket = CFSocketCreateWithNative(NULL, socket, 0, CFSocketCallback, &ctxt);
-		CFSocketSetSocketFlags(cfSocket, flags);
-		
-		src = CFSocketCreateRunLoopSource(NULL, cfSocket, 0);
-		CFRunLoopAddSource(m_runLoop, src, kCFRunLoopCommonModes);
-		
-		info.socket = cfSocket;
-		m_sockets[socket] = info;
-	}
-	
-	MySocketInfo& info = m_sockets[socket];
+	dispatch_source_t source;
 	
 	// NSLog(@"registerSocketNotifier: %p", notifier);
 	std::cout << "registerSocketNotifier: fd=" << socket << " type=" << notifier->type() << std::endl;
@@ -133,39 +89,64 @@ void QNSEventDispatcher::registerSocketNotifier(QSocketNotifier* notifier)
 	switch (notifier->type())
 	{
 	case QSocketNotifier::Read:
-	// case QSocketNotifier::Exception:
-		cbTypes = kCFSocketReadCallBack;
-		info.readNotifier = notifier;
+	case QSocketNotifier::Exception:
+		source = dispatch_source_create(DISPATCH_SOURCE_TYPE_READ, socket, 0, m_queue);
 		break;
 	case QSocketNotifier::Write:
-		cbTypes = kCFSocketWriteCallBack;
-		info.writeNotifier = notifier;
+		source = dispatch_source_create(DISPATCH_SOURCE_TYPE_WRITE, socket, 0, m_queue);
 		break;
 	default:
-		cbTypes = 0;
+		return;
 	}
 	
-	CFSocketEnableCallBacks(cfSocket, cbTypes);
+	dispatch_source_set_event_handler(source, ^{
+		QEvent event(QEvent::SockAct);
+		QCoreApplication::sendEvent(notifier, &event);
+	});
+	
+	dispatch_resume(source);
+	m_sockets[notifier] = source;
 }
 
 void QNSEventDispatcher::registerTimer(int timerId, int interval, Qt::TimerType timerType, QObject* object)
 {
-	CFRunLoopTimerRef timer;
-
-	MyTimerInfo info = { interval, timerType, object };
-	double dblInterval = double(interval)/1000.0;
-	CFRunLoopTimerContext ctxt;
-
-	memset(&ctxt, 0, sizeof(ctxt));
-	ctxt.info = (void*)(uintptr_t) timerId;
+	MyTimerInfo timerInfo;
+	dispatch_source_t source;
+	int leeway;
 	
-	timer = CFRunLoopTimerCreate(NULL, CFAbsoluteTimeGetCurrent()+dblInterval, dblInterval, 0, 0,
-								CFRunLoopTimerCallback, &ctxt);
-
-	m_timers[timerId] = info;
-	m_nsTimers[timerId] = timer;
-
-	CFRunLoopAddTimer(m_runLoop, timer, kCFRunLoopCommonModes);
+	switch (timerType)
+	{
+		case Qt::PreciseTimer:
+			leeway = 0;
+			break;
+		case Qt::CoarseTimer:
+			leeway = int(interval * 1000000 * 0.05f);
+			break;
+		case Qt::VeryCoarseTimer:
+			leeway = 1000 * 1000 * 1000;
+			break;
+		default:
+			leeway = 0;
+			break;
+	}
+	
+	source = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, m_queue);
+	dispatch_source_set_timer(source, 0, interval * 1000000, leeway);
+	
+	timerInfo.interval = interval;
+	timerInfo.type = timerType;
+	timerInfo.target = object;
+	timerInfo.source = source;
+	timerInfo.lastFired = QDateTime::currentDateTime();
+	
+	m_timers[timerId] = timerInfo;
+	
+	dispatch_source_set_event_handler(source, ^{
+		m_timers[timerId].lastFired = QDateTime::currentDateTime();
+		fireTimer(timerId);
+	});
+	
+	dispatch_resume(source);
 }
 
 void QNSEventDispatcher::fireTimer(int timerId)
@@ -176,17 +157,13 @@ void QNSEventDispatcher::fireTimer(int timerId)
 
 int QNSEventDispatcher::remainingTime(int timerId)
 {
-	if (!m_nsTimers.contains(timerId))
+	if (!m_timers.contains(timerId))
 		return -1;
 	
-	CFRunLoopTimerRef timer = m_nsTimers[timerId];
-	CFAbsoluteTime nextDate = CFRunLoopTimerGetNextFireDate(timer);
-	CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+	MyTimerInfo& timer = m_timers[timerId];
+	QDateTime next = timer.lastFired.addMSecs(timer.interval);
 	
-	if (nextDate < now)
-		return 0;
-	else
-		return int((nextDate - now) * 1000);
+	return QDateTime::currentDateTime().msecsTo(next);
 }
 
 QList<QAbstractEventDispatcher::TimerInfo> QNSEventDispatcher::registeredTimers(QObject* object) const
@@ -204,44 +181,26 @@ QList<QAbstractEventDispatcher::TimerInfo> QNSEventDispatcher::registeredTimers(
 
 void QNSEventDispatcher::unregisterSocketNotifier(QSocketNotifier* notifier)
 {
-        qDebug() << "Unregister notifier" << notifier;
-	int socket = notifier->socket();
+    qDebug() << "Unregister notifier" << notifier;
+	dispatch_source_t source;
 	
-	if (!m_sockets.contains(socket))
+	if (!m_sockets.contains(notifier))
 		return;
 	
-	MySocketInfo& info = m_sockets[socket];
-	
-	if (info.readNotifier == notifier)
-	{
-		CFSocketDisableCallBacks(info.socket, kCFSocketReadCallBack);
-		info.readNotifier = nullptr;
-	}
-	else if (info.writeNotifier == notifier)
-	{
-		CFSocketDisableCallBacks(info.socket, kCFSocketWriteCallBack);
-		info.writeNotifier = nullptr;
-	}
-	
-	if (!info.readNotifier && !info.writeNotifier)
-	{
-		CFSocketInvalidate(info.socket);
-		CFRelease(info.socket);
-		
-		m_sockets.remove(socket);
-	}
+	source = m_sockets[notifier];
+	dispatch_source_cancel(source);
+	dispatch_release(source);
 }
 
 bool QNSEventDispatcher::unregisterTimer(int timerId)
 {
-	if (!m_nsTimers.contains(timerId))
+	if (!m_timers.contains(timerId))
 		return false;
 
-	CFRunLoopTimerRef timer = m_nsTimers.take(timerId);
-	CFRunLoopTimerInvalidate(timer);
-	CFRelease(timer);
-	m_nsTimers.remove(timerId);
-	m_timers.remove(timerId);
+	MyTimerInfo& timer = m_timers[timerId];
+	
+	dispatch_source_cancel(timer.source);
+	dispatch_release(timer.source);
 
 	return true;
 }

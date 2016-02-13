@@ -4,74 +4,187 @@
 #include <Foundation/NSGeometry.h>
 #include <CoreGraphics/CGBase.h>
 #include <CoreGraphics/CGEventRef.h>
+#include <AppKit/NSTrackingArea.h>
 
 @class NSGraphicsContext;
 @class NSWindow;
 typedef NSUInteger NSEventPhase;
 typedef NSUInteger NSEventType;
 typedef NSUInteger NSPointingDeviceType;
+typedef NSUInteger NSEventModifierFlags;
 typedef unsigned long long NSEventMask;
 
+typedef short NSEventSubtype;
+
 @interface NSEvent : NSObject <NSCopying, NSCoding>
-// TODO: static stuff
+{
+#ifdef DARLING_BUILD
+	@public
+    NSEventType _type;
+	NSPoint _location;
+	unsigned int _modifierFlags;
+	NSTimeInterval _timestamp;
+	NSInteger _windowNumber;
+	NSWindow *_window;
+	NSGraphicsContext* _context;
+    union {
+        struct {
+            int eventNumber;
+            int clickCount;
+            float pressure;
+#if __LP64__
+            CGFloat deltaX;
+            CGFloat deltaY;
+            int subtype;
+            short buttonNumber;
+            short reserved1;
+            int reserved2[3];
+#endif
+        } mouse;
+        struct {
+            NSString *keys;
+            NSString *unmodKeys;
+            unsigned short keyCode;
+            BOOL isARepeat;
+#if __LP64__
+            int eventFlags;
+            int reserved[5];
+#endif
+        } key;
+        struct {
+            int eventNumber;
+            NSInteger trackingNumber;
+            void *userData;
+#if __LP64__
+            int reserved[6];
+#endif
+        } tracking;
+        struct {
+            CGFloat deltaX;
+            CGFloat deltaY;
+            CGFloat deltaZ; 
+#if __LP64__
+            short subtype;
+            short reserved1;
+            int reserved2[6];
+#endif
+        } scrollWheel;
+        struct {
+            CGFloat deltaX;
+            CGFloat deltaY;
+            CGFloat deltaZ; 
+#if __LP64__
+            int reserved[7];
+#endif
+        } axisGesture;
+        struct {
+            short subtype;
+            BOOL gestureEnded;
+            BOOL reserved;
+            int value;
+            float percentage;
+#if __LP64__
+            int reserved2[7];
+#endif
+        } miscGesture;
+        struct {
+            int subtype;
+            NSInteger data1;
+            NSInteger data2;
+#if __LP64__
+            int reserved[6];
+#endif
+        } misc;
+#if __LP64__
+        int tabletPointData[14];
+        int tabletProximityData[14];
+#endif
+    } _data;
+    void *_eventRef;
+#if __LP64__
+    void *reserved1;
+    void *reserved2;
+#endif
+#endif // DARLING_BUILD
+}
+
+@property (readonly) NSEventType type;
+@property (readonly) NSEventModifierFlags modifierFlags;
+@property (readonly) NSTimeInterval timestamp;
+@property (readonly, assign) NSWindow *window;
+@property (readonly) NSInteger windowNumber;
+@property (readonly, strong) NSGraphicsContext *context;
+@property (readonly) NSInteger clickCount;
+@property (readonly) NSInteger buttonNumber;
+@property (readonly) NSInteger eventNumber;
+@property (readonly) float pressure;
+@property (readonly) NSPoint locationInWindow;
+@property (readonly) CGFloat deltaX;    
+@property (readonly) CGFloat deltaY;    
+@property (readonly) CGFloat deltaZ;
+@property (readonly) BOOL hasPreciseScrollingDeltas;
+@property (readonly) CGFloat scrollingDeltaX;
+@property (readonly) CGFloat scrollingDeltaY;
+@property (readonly) NSEventPhase momentumPhase;
+@property (readonly, copy) NSString *characters;
+@property (readonly, copy) NSString *charactersIgnoringModifiers;
+@property (getter=isARepeat, readonly) BOOL ARepeat;
+@property (readonly) unsigned short keyCode;
+@property (readonly) NSInteger trackingNumber;
+@property (readonly) void *userData;
+@property (readonly, strong) NSTrackingArea *trackingArea;
+@property (readonly) NSEventSubtype subtype;
+@property (readonly) NSInteger data1;
+@property (readonly) NSInteger data2;
+
+
++ (NSEvent *)keyEventWithType:(NSEventType)type
+                     location:(NSPoint)location
+                modifierFlags:(NSEventModifierFlags)flags
+                    timestamp:(NSTimeInterval)time
+                 windowNumber:(NSInteger)windowNum
+                      context:(NSGraphicsContext *)context
+                   characters:(NSString *)characters
+  charactersIgnoringModifiers:(NSString *)unmodCharacters
+                    isARepeat:(BOOL)repeatKey
+                      keyCode:(unsigned short)code;
+
++ (NSEvent *)mouseEventWithType:(NSEventType)type
+                       location:(NSPoint)location
+                  modifierFlags:(NSEventModifierFlags)flags
+                      timestamp:(NSTimeInterval)time
+                   windowNumber:(NSInteger)windowNum
+                        context:(NSGraphicsContext *)context
+                    eventNumber:(NSInteger)eventNumber
+                     clickCount:(NSInteger)clickNumber
+                       pressure:(float)pressure;
+
++ (NSEvent *)enterExitEventWithType:(NSEventType)type
+                           location:(NSPoint)location
+                      modifierFlags:(NSEventModifierFlags)flags
+                          timestamp:(NSTimeInterval)time
+                       windowNumber:(NSInteger)windowNum
+                            context:(NSGraphicsContext *)context
+                        eventNumber:(NSInteger)eventNumber
+                     trackingNumber:(NSInteger)trackingNumber
+                           userData:(void *)userData;
+
++ (NSEvent *)otherEventWithType:(NSEventType)type
+                       location:(NSPoint)location
+                  modifierFlags:(NSEventModifierFlags)flags
+                      timestamp:(NSTimeInterval)time
+                   windowNumber:(NSInteger)windowNum
+                        context:(NSGraphicsContext *)context
+                        subtype:(short)subtype
+                          data1:(NSInteger)data1
+                          data2:(NSInteger)data2;
+
 + (NSEvent *)eventWithCGEvent:(CGEventRef)cgEvent;
 
 - (id)initWithCoder:(NSCoder *)decoder;
 - (void)encodeWithCoder:(NSCoder *)encoder;
 
 - (id)copyWithZone:(NSZone *)zone;
-- (NSGraphicsContext *)context;
-- (NSInteger)absoluteX;
-- (NSInteger)absoluteY;
-- (NSInteger)absoluteZ;
-- (NSUInteger)buttonMask;
-- (NSInteger)buttonNumber;
-- (NSUInteger)capabilityMask;
-- (CGEventRef)CGEvent;
-- (NSString *)characters;
-- (NSString *)charactersIgnoringModifiers;
-- (NSInteger)clickCount;
-- (NSInteger)data1;
-- (NSInteger)data2;
-- (CGFloat)deltaX;
-- (CGFloat)deltaY;
-- (CGFloat)deltaZ;
-- (NSUInteger)deviceID;
-- (NSInteger)eventNumber;
-- (const void *)eventRef;
-- (BOOL)hasPreciseScrollingDeltas;
-- (BOOL)isARepeat;
-- (BOOL)isDirectionInvertedFromDevice;
-- (BOOL)isEnteringProximity;
-- (unsigned short)keyCode;
-- (NSPoint)locationInWindow;
-- (CGFloat)magnification;
-- (NSUInteger)modifierFlags;
-- (NSEventPhase)momentumPhase;
-- (NSEventPhase)phase;
-- (NSUInteger)pointingDeviceID;
-- (NSUInteger)pointingDeviceSerialNumber;
-- (NSPointingDeviceType)pointingDeviceType;
-- (float)pressure;
-- (float)rotation;
-- (CGFloat)scrollingDeltaX;
-- (CGFloat)scrollingDeltaY;
-- (short)subtype;
-- (NSUInteger)systemTabletID;
-- (NSUInteger)tabletID;
-- (float)tangentialPressure;
-- (NSPoint)tilt;
-- (NSTimeInterval)timestamp;
-- (NSInteger)trackingNumber;
-- (NSEventType)type;
-- (unsigned long long)uniqueID;
-- (void *)userData;
-- (id)vendorDefined;
-- (NSUInteger)vendorID;
-- (NSUInteger)vendorPointingDeviceType;
-- (NSWindow *)window;
-- (NSInteger)windowNumber;
-
 @end
 
 enum {
@@ -159,6 +272,36 @@ enum {
     NSEventGestureAxisVertical
 };
 typedef NSInteger NSEventGestureAxis;
+
+enum {
+	NSWindowExposedEventType            = 0,
+    NSApplicationActivatedEventType     = 1,
+    NSApplicationDeactivatedEventType   = 2,
+    NSWindowMovedEventType              = 4,
+    NSScreenChangedEventType            = 8,
+    NSAWTEventType                      = 16,
+    
+    NSPowerOffEventType             = 1,
+    
+	/*
+    NSMouseEventSubtype             = NX_SUBTYPE_DEFAULT,
+    NSTabletPointEventSubtype       = NX_SUBTYPE_TABLET_POINT,
+    NSTabletProximityEventSubtype   = NX_SUBTYPE_TABLET_PROXIMITY,
+    NSTouchEventSubtype = NX_SUBTYPE_MOUSE_TOUCH
+	*/
+};
+
+enum {
+    NSAlphaShiftKeyMask         = 1 << 16,
+    NSShiftKeyMask              = 1 << 17,
+    NSControlKeyMask            = 1 << 18,
+    NSAlternateKeyMask          = 1 << 19,
+    NSCommandKeyMask            = 1 << 20,
+    NSNumericPadKeyMask         = 1 << 21,
+    NSHelpKeyMask               = 1 << 22,
+    NSFunctionKeyMask           = 1 << 23,
+    NSDeviceIndependentModifierFlagsMask    = 0xffff0000UL
+};
 
 
 #endif

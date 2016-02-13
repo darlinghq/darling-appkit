@@ -18,7 +18,7 @@ add_definitions(-D__STDC_LIMIT_MACROS)
 add_definitions(-DDARLING_BUILD)
 add_definitions(-DOBJC2RUNTIME -U__APPLE__)
 add_definitions(-DHAVE_STDINT_H=1)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fconstant-string-class=NSConstantString -fblocks -fobjc-runtime=gnustep-1.7")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fblocks -fconstant-string-class=NSConstantString -fblocks -fobjc-runtime=gnustep-1.7")
 set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -nostdlib -Wl,--version-script=${DARLING_TOP_DIRECTORY}/darwin.map")
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
@@ -29,16 +29,17 @@ include_directories(${CMAKE_BINARY_DIR}/src/external/foundation/Headers)
 include_directories(${DARLING_TOP_DIRECTORY}/src/external/foundation/Headers)
 include_directories(${DARLING_TOP_DIRECTORY}/src/external/corefoundation/Headers)
 include_directories(${DARLING_TOP_DIRECTORY}/src/external/libobjc2)
+include_directories(${DARLING_TOP_DIRECTORY}/src/external/libdispatch)
 
 set(AppKit_SRCS
 	NSApplication.mm
 	NSEvent.mm
-	NSQEvent.mm
 	NSResponder.mm
 	NSView.mm
 	NSWindow.mm
 	Util.mm
-	QNSEventDispatcher.mm
+	QNSEventDispatcher.cpp
+        QWindowSubclass.mm
 )
 
 SET(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/darling")

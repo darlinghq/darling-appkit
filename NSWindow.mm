@@ -1,8 +1,55 @@
+#include "QWindowSubclass.h"
 #include <AppKit/NSWindow.h>
 #include "Util.h"
 #include <Foundation/NSURL.h>
 #include <AppKit/NSScreen.h>
 #include <CoreGraphics/CGGeometry_p.h>
+#include <QMap>
+
+static QMap<int, NSWindow*> g_winIdToWindow;
+
+DEFINE_CONSTANT(NSWindowDidBecomeKeyNotification);
+DEFINE_CONSTANT(NSWindowDidBecomeMainNotification);
+DEFINE_CONSTANT(NSWindowDidChangeScreenNotification);
+DEFINE_CONSTANT(NSWindowDidDeminiaturizeNotification);
+DEFINE_CONSTANT(NSWindowDidExposeNotification);
+DEFINE_CONSTANT(NSWindowDidMiniaturizeNotification);
+DEFINE_CONSTANT(NSWindowDidMoveNotification);
+DEFINE_CONSTANT(NSWindowDidResignKeyNotification);
+DEFINE_CONSTANT(NSWindowDidResignMainNotification);
+DEFINE_CONSTANT(NSWindowDidResizeNotification);
+DEFINE_CONSTANT(NSWindowDidUpdateNotification);
+DEFINE_CONSTANT(NSWindowWillCloseNotification);
+DEFINE_CONSTANT(NSWindowWillMiniaturizeNotification);
+DEFINE_CONSTANT(NSWindowWillMoveNotification);
+DEFINE_CONSTANT(NSWindowWillBeginSheetNotification);
+DEFINE_CONSTANT(NSWindowDidEndSheetNotification);
+DEFINE_CONSTANT(NSWindowDidChangeBackingPropertiesNotification);
+DEFINE_CONSTANT(NSBackingPropertyOldScaleFactorKey);
+DEFINE_CONSTANT(NSBackingPropertyOldColorSpaceKey);
+DEFINE_CONSTANT(NSWindowDidChangeScreenProfileNotification);
+DEFINE_CONSTANT(NSWindowWillStartLiveResizeNotification);
+DEFINE_CONSTANT(NSWindowDidEndLiveResizeNotification);
+DEFINE_CONSTANT(NSWindowWillEnterFullScreenNotification);
+DEFINE_CONSTANT(NSWindowDidEnterFullScreenNotification);
+DEFINE_CONSTANT(NSWindowWillExitFullScreenNotification);
+DEFINE_CONSTANT(NSWindowDidExitFullScreenNotification);
+DEFINE_CONSTANT(NSWindowWillEnterVersionBrowserNotification);
+DEFINE_CONSTANT(NSWindowDidEnterVersionBrowserNotification);
+DEFINE_CONSTANT(NSWindowWillExitVersionBrowserNotification);
+DEFINE_CONSTANT(NSWindowDidExitVersionBrowserNotification);
+
+
+@implementation NSWindow (DarlingExt)
++ (NSWindow*) windowByWindowNumber: (NSInteger) winId
+{
+	auto it = g_winIdToWindow.find(winId);
+	if (it == g_winIdToWindow.end())
+		return NULL;
+	else
+		return *it;
+}
+@end
 
 @implementation NSWindow
 - (id)initWithContentRect:(NSRect)contentRect styleMask:(NSUInteger)aStyle backing:(NSBackingStoreType)bufferingType defer:(BOOL)flag
@@ -36,7 +83,7 @@
 
 	_opacity = 1;
 	_releasedWhenClosed = true; // TODO: implement release unless controller is present
-	_window = std::shared_ptr<QQuickWindow>(new QQuickWindow);
+	_window = std::make_shared<QWindowSubclass>(self);
 	_window->setGeometry(frame);
 
 	if (!(aStyle & NSResizableWindowMask))
@@ -44,8 +91,16 @@
 		_window->setMaximumSize(_window->baseSize());
 		_window->setMinimumSize(_window->baseSize());
 	}
+	
+	g_winIdToWindow[_window->winId()] = self;
 
 	return self;
+}
+
+- (void) dealloc
+{
+	g_winIdToWindow.remove([self windowNumber]);
+	[super dealloc];
 }
 
 - (NSString *)title

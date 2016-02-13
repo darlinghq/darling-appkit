@@ -3,6 +3,7 @@
 #ifdef DARLING_BUILD
 #	include <QEventLoop>
 #	include <QGuiApplication>
+#	include <Foundation/NSArray.h>
 #	include "QNSEventDispatcher.h"
 
 class NSApplicationEventFilter;
@@ -20,7 +21,7 @@ class NSApplicationEventFilter;
 	bool m_running;
 	QGuiApplication* m_application;
 	id<NSApplicationDelegate> m_delegate;
-	NSApplicationEventFilter* m_eventFilter;
+	NSMutableArray* m_pendingEvents;
 }
 #endif
 
@@ -38,6 +39,8 @@ class NSApplicationEventFilter;
 - (NSEvent *)nextEventMatchingMask:(NSUInteger)mask untilDate:(NSDate *)expiration inMode:(NSString *)mode dequeue:(BOOL)flag;
 
 - (void)sendEvent:(NSEvent *)anEvent;
+- (void)postEvent:(NSEvent *)anEvent
+          atStart:(BOOL)flag;
 
 @end
 
