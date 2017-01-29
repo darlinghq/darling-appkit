@@ -1,0 +1,7 @@
+[submodule "gui"]
+	path = gui
+	url = ../darling-appkit-gui.git
+[submodule "back"]
+        path = back
+        url = ../darling-appkit-back.git
+
